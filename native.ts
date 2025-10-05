@@ -118,7 +118,7 @@ function killZombieMonitors() {
             }
         });
     } catch (err) {
-        console.info("[WayAFKNext] Error killing zombie monitors:", err);
+        console.error("[WayAFKNext] Error killing zombie monitors:", err);
     }
 }
 
@@ -285,7 +285,3 @@ process.on("exit", _killMonitor);
 process.on("SIGINT", _killMonitor);
 process.on("SIGTERM", _killMonitor);
 process.on("SIGQUIT", _killMonitor);
-
-// const result = await webframe.executeJavascript(
-//   `Vencord.Plugins.plugins.MyPlugin.handleEvent(${JSON.stringify(event)});`
-// );
