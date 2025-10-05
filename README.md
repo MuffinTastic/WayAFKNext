@@ -1,6 +1,11 @@
 # WayAFKNext
 
-A Vencord plugin that fixes auto AFK functionality on Linux Wayland desktops.
+A Vencord plugin that fixes auto AFK functionality on Linux Wayland desktops and adds some optional features:
+
+- Disable AFK detection altogether if you wish. Peace of mind for some.
+- Force mobile push notifications regardless of whether you're AFK or not
+- Set mobile push notification timeout separately from Idle status timeout
+- Set Idle status and mobile push notification timeouts up to 30 minutes
 
 Inspired by [WayAFK](https://github.com/Colonial-Dev/WayAFK)'s goals and limitations.
 
