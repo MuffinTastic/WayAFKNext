@@ -15,7 +15,7 @@ Same as always with Vencord plugins.
 
 https://docs.vencord.dev/installing/custom-plugins/
 
-Use the latest version from releases.
+Use the [latest version from releases](/releases/latest).
 
 File paths should look like `userplugins/WayAFKNext/index.tsx`, etc.
 
