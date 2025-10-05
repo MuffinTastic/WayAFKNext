@@ -19,7 +19,7 @@ async function setDebug(_debug: boolean) {
 
 const settings = definePluginSettings({
     enableDetection: {
-        description: "Enable/disable AFK detection. This plugin actually patches out the original AFK functionality, so disabling this might be useful to some.",
+        description: "Enable/disable AFK detection. It might be broken without this plugin, but turning this off ensures it's *off*.",
         type: OptionType.BOOLEAN,
         default: true,
         onChange: toggleDetection
