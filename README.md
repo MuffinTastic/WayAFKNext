@@ -30,6 +30,6 @@ This downloads a pre-built binary: https://github.com/MuffinTastic/wayafknext-mo
 
 The binary is nothing but a bridge between Discord and `wayland-protocols ext-idle-notify-v1` / `org.gnome.Mutter.IdleMonitor` using a UNIX socket. The plugin issues commands to start/stop watches with different durations. When the bridge informs the plugin the user has gone AFK or came back, the plugin calls Discord's existing AFK functionality.
 
-I did it this way to avoid adding extra dependencies to Vencord, though realistically that wouldn't have hurt anything.
+I did it this way to avoid adding extra dependencies to Vencord, though realistically that wouldn't have hurt anything, and to avoid implementing all that stuff in nodejs to begin with. nodejs is yucky.
 
 Binary and socket end up in `~/.config/Vencord/wayafknext/`.
