@@ -5,12 +5,17 @@
  */
 
 import { DATA_DIR } from "@main/utils/constants";
-import { ChildProcessWithoutNullStreams, spawn } from "child_process";
+import { ChildProcessWithoutNullStreams, execSync, spawn } from "child_process";
 import crypto from "crypto";
 import { IpcMainInvokeEvent, WebContents } from "electron";
 import fs, { chmodSync } from "fs";
+import net from "net";
 import os from "os";
 import path from "path";
+import readline from "readline";
+
+// why is nodejs bad?
+const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 const platform = os.platform();
 
@@ -33,15 +38,17 @@ function getArch(): string {
 
 const arch = getArch();
 
-const url = `https://github.com/MuffinTastic/wayafknext-monitor/releases/download/v0.1.1-s/wayafknext-monitor.${arch}`;
+const url = `https://github.com/MuffinTastic/wayafknext-monitor/releases/download/v0.2.3/wayafknext-monitor.${arch}`;
 const shas = {
-    "x86_64": "d371d3edb33f2f9de3702602564915ba93e00c959b1e839c8108caf38936f733",
-    "aarch64": "8d7abff15008270ba8cd5cbee8e6383b0106e185d579806a2b8f2c2b21be60eb",
+    "aarch64": "2fba12f3d73cae986ac54670fcef6fe3b509449595658afda7f87a00630cebe4",
+    "x86_64": "bc83de4b5819ad9a8ec645705dc59bfd506e33c8134c2a978805494652a4f5d0",
 };
 
 const tmpDir = path.join(DATA_DIR, "wayafknext");
-const fileName = path.basename(url);
-const filePath = path.join(tmpDir, fileName);
+const procName = path.basename(url);
+const sockName = "wayafknext.sock";
+const procPath = path.join(tmpDir, procName);
+const sockPath = path.join(tmpDir, sockName);
 
 async function downloadToBuffer(url: string): Promise<Buffer> {
     const res = await fetch(url);
@@ -56,8 +63,8 @@ function verifySha(buffer: Buffer, arch: string): boolean {
 }
 
 export async function downloadAndVerify(_: IpcMainInvokeEvent) {
-    if (fs.existsSync(filePath)) {
-        const existing = fs.readFileSync(filePath);
+    if (fs.existsSync(procPath)) {
+        const existing = fs.readFileSync(procPath);
         if (verifySha(existing, arch)) {
             console.log("[WayAFKNext] Binary found");
             return;
@@ -72,64 +79,192 @@ export async function downloadAndVerify(_: IpcMainInvokeEvent) {
         throw new Error("Binary hash didn't match, aborting");
     }
 
-    await fs.promises.writeFile(filePath, buffer);
+    await fs.promises.writeFile(procPath, buffer);
 
-    chmodSync(filePath, 0o755);
+    chmodSync(procPath, 0o755);
 
     console.log("[WayAFKNext] Downloaded binary!");
 }
 
 let webFrame: WebContents;
 let proc: ChildProcessWithoutNullStreams | null = null;
+let procRL;
+let procErrRL;
+let sock: net.Socket | null = null;
+let sockRL;
+
+// HACK HACK HACK
+// why are monitors getting left behind? i don't know. kill them!
+function killZombieMonitors() {
+    try {
+        console.log("[WayAFKNext] Searching for zombie monitors");
+        const ps = execSync("ps -eo pid,cmd").toString();
+        const lines = ps.split("\n");
+        lines.forEach(line => {
+            if (line.includes(procName)) {
+                const cols = line.trim().split(/\s+/);
+                const pid = Number(cols[0]);
+
+                if (pid && !isNaN(pid)) {
+                    process.kill(pid, "SIGTERM");
+                    console.log("[WayAFKNext] Killed:", pid, line);
+                }
+            }
+        });
+    } catch (err) {
+        console.info("[WayAFKNext] Error killing zombie monitors:", err);
+    }
+}
 
 export async function startMonitor(e: IpcMainInvokeEvent) {
     if (proc) return;
+
+    killZombieMonitors();
 
     console.log("[WayAFKNext] Starting monitor");
 
     webFrame = e.sender;
 
-    proc = spawn(filePath, [], {
+    proc = spawn(procPath, [], {
         detached: false,
         stdio: "pipe"
     });
 
     proc.stdout.setEncoding("utf-8");
-    proc.stdout.on("data", (data: string) => {
+
+    procRL = readline.createInterface({
+        input: proc.stdout,
+        crlfDelay: Infinity
+    });
+
+    procRL.on("line", data => {
+        console.log("[WayAFKNext] stdout", data);
+        const text = data.trim();
+        sendEvent({ Info: text });
+    });
+
+    proc.stderr.setEncoding("utf-8");
+
+    procErrRL = readline.createInterface({
+        input: proc.stderr,
+        crlfDelay: Infinity
+    });
+
+    procErrRL.on("line", data => {
+        console.log("[WayAFKNext] stderr", data);
+        const text = data.trim();
+        sendEvent({ Error: text });
+    });
+
+    proc.on("close", code => {
+        sendEvent({ Exited: code });
+        if (sock) {
+            sock.end();
+            sock = null;
+            sockRL = null;
+        }
+        proc = null;
+        procRL = null;
+        procErrRL = null;
+    });
+
+
+    // plenty of time for it to open the socket
+    await delay(25);
+
+
+    sock = net.createConnection(sockPath, () => {
+        console.log("[WayAFKNext] Connected to socket");
+        sendEvent({ Connected: null });
+    });
+
+    sockRL = readline.createInterface({
+        input: sock,
+        crlfDelay: Infinity
+    });
+
+    sockRL.on("line", data => {
         const text = data.trim();
         sendEvent(text);
     });
 
-    proc.on("close", code => {
-        sendEvent({ Exit: code });
-        proc = null;
+    sock.on("error", err => {
+        sendEvent({ Error: err.toString() });
+    });
+
+    sock.on("end", () => {
+        sock = null;
+        sockRL = null;
+        _killMonitor();
     });
 }
 
 function sendEvent(event: any) {
+    if (typeof event !== "string") {
+        event = JSON.stringify(event);
+    }
+    else {
+        try {
+            JSON.parse(event);
+        } catch (error) {
+            console.error("[WayAFKNext] Invalid event JSON:", event);
+            console.error("[WayAFKNext]", error);
+            return;
+        }
+    }
+
+    const exec = `Vencord.Plugins.plugins.WayAFKNext.handleEvent(${event});`;
+    console.log("[WayAFKNext] exec", exec);
     webFrame.executeJavaScript(
-        `Vencord.Plugins.plugins.WayAFKNext.handleEvent(${JSON.stringify(event)});`
+        exec
     );
 }
 
-
-export async function startWatch(_: IpcMainInvokeEvent, timeoutMins: number) {
-    if (proc) {
-        proc.stdin.write(timeoutMins + "\n");
+function writeCommand(cmd: any) {
+    if (sock) {
+        sock.write(JSON.stringify(cmd) + "\n");
     }
+}
+
+export async function startWatch(_: IpcMainInvokeEvent, statusTimeout: number, notifsTimeout) {
+    const cmd = {
+        StartWatch: [statusTimeout, notifsTimeout]
+    };
+
+    writeCommand(cmd);
 }
 
 export async function stopWatch() {
-    if (proc) {
-        proc.stdin.write("stop\n");
-    }
+    const cmd = {
+        StopWatch: null
+    };
+
+    writeCommand(cmd);
 }
 
-function _killMonitor() {
+async function _killMonitor() {
+    let killedSock = false;
+
+    if (sock) {
+        const cmd = {
+            Quit: null
+        };
+
+        sock.write(JSON.stringify(cmd));
+        sock.end();
+        sock = null;
+        sockRL = null;
+        killedSock = true;
+    }
+
     if (proc) {
+        if (killedSock)
+            await delay(50);
+
         proc.kill();
         proc = null;
-        sendEvent({ Exit: 0 });
+        procRL = null;
+        procErrRL = null;
     }
 }
 

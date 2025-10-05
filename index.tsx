@@ -4,27 +4,94 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { definePluginSettings } from "@api/Settings";
+import { definePluginSettings, Settings } from "@api/Settings";
 import definePlugin, { OptionType, PluginNative } from "@utils/types";
 import { FluxDispatcher } from "@webpack/common";
 
 const Native = VencordNative.pluginHelpers.WayAFKNext as PluginNative<typeof import("./native")>;
 
-const pluginSettings = definePluginSettings({
+const settings = definePluginSettings({
     enableDetection: {
-        description: "Turn it all off.",
+        description: "Enable/disable AFK detection. This plugin actually patches out the original AFK functionality, so disabling this might be useful to some.",
         type: OptionType.BOOLEAN,
-        default: false,
+        default: true,
+        onChange: toggleDetection
     },
+    statusIdleTimeout: {
+        description: "How long until your status visibly changes to Idle.",
+        type: OptionType.SLIDER,
+        default: 5,
+        markers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 30],
+        onChange: restartWatch
+    },
+    pushNotificationsTimeout: {
+        description: "How long until you start receiving mobile push notifications. If this is set to 0, it'll be the same as the status timeout.",
+        type: OptionType.SLIDER,
+        default: 0,
+        markers: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 30],
+        onChange: restartWatch
+    }
 });
+
+async function toggleDetection() {
+    const enabled = Settings.plugins.WayAFKNext.enableDetection;
+
+    console.log("[WayAFKNext] Toggling AFK detection:", enabled);
+
+    if (enabled) {
+        await startMonitor();
+    } else {
+        await stopMonitor();
+    }
+}
+
+async function startMonitor() {
+    if (!await Native.monitorIsRunning()) {
+        console.log("[WayAFKNext] Starting monitor");
+
+        try {
+            await Native.downloadAndVerify();
+        } catch (err) {
+            console.error("[WayAFKNext]", err);
+            return;
+        }
+
+        await Native.startMonitor();
+
+        console.log("[WayAFKNext] Monitor started");
+    }
+}
+
+async function stopMonitor() {
+    if (await Native.monitorIsRunning()) {
+        console.log("[WayAFKNext] Stopping");
+        await Native.stopWatch();
+        await Native.killMonitor();
+    }
+}
+
+async function restartWatch() {
+    const enabled = Settings.plugins.WayAFKNext.enableDetection;
+
+    if (enabled) {
+        const statusTimeout = Number(Settings.plugins.WayAFKNext.statusIdleTimeout);
+        let notifsTimeout = Number(Settings.plugins.WayAFKNext.pushNotificationsTimeout);
+
+        if (notifsTimeout === 0)
+            notifsTimeout = statusTimeout;
+
+        await Native.startWatch(statusTimeout, notifsTimeout);
+    }
+}
 
 export default definePlugin({
     name: "WayAFKNext",
     description: "Fixes auto AFK functionality on Wayland Linux desktops",
     authors: [{ name: "MuffinTastic", id: 0n }],
 
-    // remove base Discord AFK dispatches for peace of mind
-    // these don't do anything on linux anyways
+    settings,
+
+    // remove base Discord AFK dispatches
     patches: [
         {
             find: 'type:"IDLE",idle:',
@@ -55,71 +122,77 @@ export default definePlugin({
     ],
 
     async start() {
-        console.log("[WayAFKNext] Starting");
+        const enabled = Settings.plugins.WayAFKNext.enableDetection;
 
-        try {
-            await Native.downloadAndVerify();
-        } catch (err) {
-            console.error("[WayAFKNext]", err);
+        if (!enabled) {
+            console.log("[WayAFKNext] AFK detection disabled");
             return;
         }
 
-        await Native.startMonitor();
-
-        await Native.startWatch(1);
-        console.log("[WayAFKNext] Started");
+        startMonitor();
     },
 
-    stop() {
-        Native.stopWatch();
-        Native.killMonitor();
-        console.log("[WayAFKNext] Stopping");
-
+    async stop() {
+        stopMonitor();
     },
 
-    async handleEvent(data: string) {
-        const evt = JSON.parse(data);
+    async handleEvent(evt: any) {
+        if ("Info" in evt) {
+            console.log("[WayAFKNext] [Monitor]", evt.Info);
+        }
+        if ("Error" in evt) {
+            console.error("[WayAFKNext] [Monitor]", evt.Error);
+        }
+        if ("Connected" in evt) {
+            await this.onMonitorConnected();
+        }
+        if ("Exited" in evt) {
+            await this.onMonitorExited(evt.Exit);
+        }
 
-        if ("Idle" in evt) {
-            this.onIdleState(evt.Idle);
-        } else if ("WatchStarted" in evt) {
-            this.onWatchStarted(evt.WatchStarted);
-        } else if ("WatchStopped" in evt) {
-            this.onWatchStopped();
-        } else if ("Error" in evt) {
-            this.onMonitorError(evt.Error);
-        } else if ("Exit" in evt) {
-            this.onMonitorExit(evt.Exit);
+        if ("WatchEvent" in evt) {
+            await this.onWatchEvent(evt.WatchEvent);
+        }
+        if ("WatchStarted" in evt) {
+            await this.onWatchStarted(evt.WatchStarted[0], evt.WatchStarted[1]);
+        }
+        if ("WatchStopped" in evt) {
+            await this.onWatchStopped();
         }
     },
 
-    async onIdleState(idle: boolean) {
-        console.log("[WayAFKNext] Watch reports idle:", idle);
-
-        FluxDispatcher.dispatch({
-            type: "IDLE",
-            idle: idle
-        });
-
-        FluxDispatcher.dispatch({
-            type: "AFK",
-            afk: idle
-        });
+    async onMonitorConnected() {
+        restartWatch();
     },
 
-    async onWatchStarted(duration: number) {
-        console.log("[WayAFKNext] Watch started with a duration of", duration, "minutes");
+    async onMonitorExited(code: number) {
+        console.log("[WayAFKNext] Monitor exited with code", code);
+    },
+
+    async onWatchEvent(evt: any) {
+
+        if ("StatusIdle" in evt) {
+            console.log("[WayAFKNext] Status idle state:", evt.StatusIdle);
+
+            FluxDispatcher.dispatch({
+                type: "IDLE",
+                idle: !!evt.StatusIdle
+            });
+        }
+        if ("NotifsIdle" in evt) {
+            console.log("[WayAFKNext] Notifications idle state:", evt.NotifsIdle);
+            FluxDispatcher.dispatch({
+                type: "AFK",
+                afk: !!evt.NotifsIdle
+            });
+        }
+    },
+
+    async onWatchStarted(statusTimeout: number, notifsTimeout: number) {
+        console.log("[WayAFKNext] Watch started:", statusTimeout, "for status,", notifsTimeout, "for notifications.");
     },
 
     async onWatchStopped() {
         console.log("[WayAFKNext] Watch stopped");
-    },
-
-    async onMonitorError(error: string) {
-        console.error("[WayAFKNext] Monitor error", error);
-    },
-
-    async onMonitorExit(code: number) {
-        console.log("[WayAFKNext] Monitor exited with code", code);
     }
 });
