@@ -137,7 +137,7 @@ async function updatePush() {
 
 export default definePlugin({
     name: "WayAFKNext",
-    description: "Fixes auto AFK functionality on Wayland Linux desktops",
+    description: "Fixes auto AFK functionality on Linux Wayland desktops",
     authors: [{ name: "MuffinTastic", id: 0n }],
 
     settings,
