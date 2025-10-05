@@ -10,6 +10,13 @@ import { FluxDispatcher } from "@webpack/common";
 
 const Native = VencordNative.pluginHelpers.WayAFKNext as PluginNative<typeof import("./native")>;
 
+let debug = false;
+
+async function setDebug(_debug: boolean) {
+    debug = _debug;
+    await Native.setDebug(_debug);
+}
+
 const settings = definePluginSettings({
     enableDetection: {
         description: "Enable/disable AFK detection. This plugin actually patches out the original AFK functionality, so disabling this might be useful to some.",
@@ -30,13 +37,19 @@ const settings = definePluginSettings({
         default: 0,
         markers: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 30],
         onChange: restartWatch
+    },
+    debug: {
+        description: "Enable/disable debug output in console. You probably don't need this.",
+        type: OptionType.BOOLEAN,
+        default: false,
+        onChange: () => setDebug(!debug)
     }
 });
 
 async function toggleDetection() {
     const enabled = Settings.plugins.WayAFKNext.enableDetection;
 
-    console.log("[WayAFKNext] Toggling AFK detection:", enabled);
+    if (debug) console.log("[WayAFKNext] Toggling AFK detection:", enabled);
 
     if (enabled) {
         await startMonitor();
@@ -47,7 +60,7 @@ async function toggleDetection() {
 
 async function startMonitor() {
     if (!await Native.monitorIsRunning()) {
-        console.log("[WayAFKNext] Starting monitor");
+        if (debug) console.log("[WayAFKNext] Starting monitor");
 
         try {
             await Native.downloadAndVerify();
@@ -64,9 +77,10 @@ async function startMonitor() {
 
 async function stopMonitor() {
     if (await Native.monitorIsRunning()) {
-        console.log("[WayAFKNext] Stopping");
+        if (debug) console.log("[WayAFKNext] Stopping monitor");
         await Native.stopWatch();
         await Native.killMonitor();
+        console.log("[WayAFKNext] Monitor stopped");
     }
 }
 
@@ -122,6 +136,8 @@ export default definePlugin({
     ],
 
     async start() {
+        setDebug(Settings.plugins.WayAFKNext.debug);
+
         const enabled = Settings.plugins.WayAFKNext.enableDetection;
 
         if (!enabled) {
@@ -138,10 +154,10 @@ export default definePlugin({
 
     async handleEvent(evt: any) {
         if ("Info" in evt) {
-            console.log("[WayAFKNext] [Monitor]", evt.Info);
+            if (debug) console.log("[WayAFKNext] [Monitor]", evt.Info);
         }
         if ("Error" in evt) {
-            console.error("[WayAFKNext] [Monitor]", evt.Error);
+            if (debug) console.error("[WayAFKNext] [Monitor]", evt.Error);
         }
         if ("Connected" in evt) {
             await this.onMonitorConnected();
@@ -166,21 +182,20 @@ export default definePlugin({
     },
 
     async onMonitorExited(code: number) {
-        console.log("[WayAFKNext] Monitor exited with code", code);
+        if (debug) console.log("[WayAFKNext] Monitor exited with code", code);
     },
 
     async onWatchEvent(evt: any) {
 
         if ("StatusIdle" in evt) {
-            console.log("[WayAFKNext] Status idle state:", evt.StatusIdle);
-
+            if (debug) console.log("[WayAFKNext] Status idle state:", evt.StatusIdle);
             FluxDispatcher.dispatch({
                 type: "IDLE",
                 idle: !!evt.StatusIdle
             });
         }
         if ("NotifsIdle" in evt) {
-            console.log("[WayAFKNext] Notifications idle state:", evt.NotifsIdle);
+            if (debug) console.log("[WayAFKNext] Notifications idle state:", evt.NotifsIdle);
             FluxDispatcher.dispatch({
                 type: "AFK",
                 afk: !!evt.NotifsIdle
@@ -194,5 +209,5 @@ export default definePlugin({
 
     async onWatchStopped() {
         console.log("[WayAFKNext] Watch stopped");
-    }
+    },
 });

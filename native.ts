@@ -17,6 +17,12 @@ import readline from "readline";
 // why is nodejs bad?
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
+let debug = false;
+
+export function setDebug(_: IpcMainInvokeEvent, _debug: boolean) {
+    debug = _debug;
+}
+
 const platform = os.platform();
 
 if (platform !== "linux") {
@@ -138,7 +144,7 @@ export async function startMonitor(e: IpcMainInvokeEvent) {
     });
 
     procRL.on("line", data => {
-        console.log("[WayAFKNext] stdout", data);
+        if (debug) console.log("[WayAFKNext] stdout", data);
         const text = data.trim();
         sendEvent({ Info: text });
     });
@@ -214,7 +220,7 @@ function sendEvent(event: any) {
     }
 
     const exec = `Vencord.Plugins.plugins.WayAFKNext.handleEvent(${event});`;
-    console.log("[WayAFKNext] exec", exec);
+    if (debug) console.log("[WayAFKNext] exec", exec);
     webFrame.executeJavaScript(
         exec
     );
