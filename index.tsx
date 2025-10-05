@@ -15,28 +15,51 @@ let debug = false;
 async function setDebug(_debug: boolean) {
     debug = _debug;
     await Native.setDebug(_debug);
+    console.log("[WayAFKNext] Debug:", debug);
+}
+
+function utilSetDiscordIdle(idle: boolean) {
+    if (debug) console.log("[WayAFKNext] [Util] Set Discord Idle", idle);
+    FluxDispatcher.dispatch({
+        type: "IDLE",
+        idle
+    });
+}
+
+function utilSetDiscordAFK(afk: boolean) {
+    if (debug) console.log("[WayAFKNext] [Util] Set Discord AFK", afk);
+    FluxDispatcher.dispatch({
+        type: "AFK",
+        afk
+    });
 }
 
 const settings = definePluginSettings({
     enableDetection: {
-        description: "Enable/disable AFK detection. It might be broken without this plugin, but turning this off ensures it's *off*.",
+        description: "Enable/disable AFK detection. It might be broken without this plugin, but if you turn it off here, it's actually *off*.",
         type: OptionType.BOOLEAN,
         default: true,
-        onChange: toggleDetection
+        onChange: updateMonitor
+    },
+    alwaysSendPushNotifications: {
+        description: "Always send push notifications regardless of activity. Overrides corresponding timeout. If this is off and AFK detection is off, you won't ever receive push notifications.",
+        type: OptionType.BOOLEAN,
+        default: false,
+        onChange: updatePush,
     },
     statusIdleTimeout: {
         description: "How long until your status visibly changes to Idle.",
         type: OptionType.SLIDER,
         default: 5,
         markers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 30],
-        onChange: restartWatch
+        onChange: updateWatch
     },
     pushNotificationsTimeout: {
         description: "How long until you start receiving mobile push notifications. If this is set to 0, it'll be the same as the status timeout.",
         type: OptionType.SLIDER,
         default: 0,
         markers: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 30],
-        onChange: restartWatch
+        onChange: updateWatch,
     },
     debug: {
         description: "Enable/disable debug output in console. You probably don't need this.",
@@ -46,7 +69,7 @@ const settings = definePluginSettings({
     }
 });
 
-async function toggleDetection() {
+async function updateMonitor() {
     const enabled = Settings.plugins.WayAFKNext.enableDetection;
 
     if (debug) console.log("[WayAFKNext] Toggling AFK detection:", enabled);
@@ -54,7 +77,7 @@ async function toggleDetection() {
     if (enabled) {
         await startMonitor();
     } else {
-        await stopMonitor();
+        await stopMonitor(false);
     }
 }
 
@@ -75,16 +98,22 @@ async function startMonitor() {
     }
 }
 
-async function stopMonitor() {
+async function stopMonitor(shutdown: boolean) {
     if (await Native.monitorIsRunning()) {
         if (debug) console.log("[WayAFKNext] Stopping monitor");
         await Native.stopWatch();
         await Native.killMonitor();
         console.log("[WayAFKNext] Monitor stopped");
     }
+
+    if (!shutdown) {
+        const alwaysSend = Settings.plugins.WayAFKNext.alwaysSendPushNotifications;
+        utilSetDiscordIdle(false);
+        utilSetDiscordAFK(alwaysSend);
+    }
 }
 
-async function restartWatch() {
+async function updateWatch() {
     const enabled = Settings.plugins.WayAFKNext.enableDetection;
 
     if (enabled) {
@@ -96,6 +125,14 @@ async function restartWatch() {
 
         await Native.startWatch(statusTimeout, notifsTimeout);
     }
+}
+
+async function updatePush() {
+    const alwaysSend = Settings.plugins.WayAFKNext.alwaysSendPushNotifications;
+
+    if (debug) console.log("[WayAFKNext] Toggling always send push notifications:", alwaysSend);
+
+    utilSetDiscordAFK(alwaysSend);
 }
 
 export default definePlugin({
@@ -136,12 +173,13 @@ export default definePlugin({
     ],
 
     async start() {
-        setDebug(Settings.plugins.WayAFKNext.debug);
+        await setDebug(Settings.plugins.WayAFKNext.debug);
 
         const enabled = Settings.plugins.WayAFKNext.enableDetection;
 
         if (!enabled) {
             console.log("[WayAFKNext] AFK detection disabled");
+            await stopMonitor(false);
             return;
         }
 
@@ -149,7 +187,7 @@ export default definePlugin({
     },
 
     async stop() {
-        stopMonitor();
+        stopMonitor(true);
     },
 
     async handleEvent(evt: any) {
@@ -165,7 +203,6 @@ export default definePlugin({
         if ("Exited" in evt) {
             await this.onMonitorExited(evt.Exit);
         }
-
         if ("WatchEvent" in evt) {
             await this.onWatchEvent(evt.WatchEvent);
         }
@@ -178,7 +215,7 @@ export default definePlugin({
     },
 
     async onMonitorConnected() {
-        restartWatch();
+        updateWatch();
     },
 
     async onMonitorExited(code: number) {
@@ -186,20 +223,16 @@ export default definePlugin({
     },
 
     async onWatchEvent(evt: any) {
+        const alwaysSend = Settings.plugins.WayAFKNext.alwaysSendPushNotifications;
 
         if ("StatusIdle" in evt) {
             if (debug) console.log("[WayAFKNext] Status idle state:", evt.StatusIdle);
-            FluxDispatcher.dispatch({
-                type: "IDLE",
-                idle: !!evt.StatusIdle
-            });
+            utilSetDiscordIdle(!!evt.StatusIdle);
         }
-        if ("NotifsIdle" in evt) {
+
+        if ("NotifsIdle" in evt && !alwaysSend) {
             if (debug) console.log("[WayAFKNext] Notifications idle state:", evt.NotifsIdle);
-            FluxDispatcher.dispatch({
-                type: "AFK",
-                afk: !!evt.NotifsIdle
-            });
+            utilSetDiscordAFK(!!evt.NotifsIdle);
         }
     },
 
