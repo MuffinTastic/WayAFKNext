@@ -44,10 +44,10 @@ function getArch(): string {
 
 const arch = getArch();
 
-const url = `https://github.com/MuffinTastic/wayafknext-monitor/releases/download/v0.2.3/wayafknext-monitor.${arch}`;
+const url = `https://github.com/MuffinTastic/wayafknext-monitor/releases/download/v0.3.0/wayafknext-monitor.${arch}`;
 const shas = {
-    "aarch64": "2fba12f3d73cae986ac54670fcef6fe3b509449595658afda7f87a00630cebe4",
-    "x86_64": "bc83de4b5819ad9a8ec645705dc59bfd506e33c8134c2a978805494652a4f5d0",
+    "aarch64": "72f7400d0549cb760019fbd8ecf8086efca1841a01e9446f4c888e201914865a",
+    "x86_64": "f414550d9cf4771760921ee678468fd15523560a27c4fc2d8d0ee36be61be11f",
 };
 
 const tmpDir = path.join(DATA_DIR, "wayafknext");
@@ -234,7 +234,7 @@ function writeCommand(cmd: any) {
 
 export async function startWatch(_: IpcMainInvokeEvent, statusTimeout: number, notifsTimeout) {
     const cmd = {
-        StartWatch: [statusTimeout, notifsTimeout]
+        StartWatch: { status_mins: statusTimeout, notifs_mins: notifsTimeout }
     };
 
     writeCommand(cmd);

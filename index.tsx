@@ -207,7 +207,7 @@ export default definePlugin({
             await this.onWatchEvent(evt.WatchEvent);
         }
         if ("WatchStarted" in evt) {
-            await this.onWatchStarted(evt.WatchStarted[0], evt.WatchStarted[1]);
+            await this.onWatchStarted(evt.WatchStarted.status_mins, evt.WatchStarted.notifs_mins);
         }
         if ("WatchStopped" in evt) {
             await this.onWatchStopped();
