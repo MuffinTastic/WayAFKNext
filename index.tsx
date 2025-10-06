@@ -48,7 +48,7 @@ const settings = definePluginSettings({
         onChange: updatePush,
     },
     statusIdleTimeout: {
-        description: "How long until your status visibly changes to Idle.",
+        description: "How long until your status visibly changes to Idle. This is used instead of Discord's built-in timeout selector.",
         type: OptionType.SLIDER,
         default: 5,
         markers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 30],
