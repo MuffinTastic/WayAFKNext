@@ -9,6 +9,8 @@ A Vencord plugin that fixes auto AFK functionality on Linux Wayland desktops and
 
 Inspired by [WayAFK](https://github.com/Colonial-Dev/WayAFK)'s goals and limitations.
 
+It should be noted that this circumvents the Push Notification Inactive Time-out setting in Discord's notifications settings. All configuration should be done in Vencord > Plugins > WayAFKNext (Settings gear).
+
 ## Platform Support
 
 - x86_64 / AMD64
