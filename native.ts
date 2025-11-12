@@ -44,6 +44,7 @@ function getArch(): string {
 
 const arch = getArch();
 
+const downloadPrebuilt = true;
 const url = `https://github.com/MuffinTastic/wayafknext-monitor/releases/download/v0.3.0/wayafknext-monitor.${arch}`;
 const shas = {
     "aarch64": "72f7400d0549cb760019fbd8ecf8086efca1841a01e9446f4c888e201914865a",
@@ -69,27 +70,36 @@ function verifySha(buffer: Buffer, arch: string): boolean {
 }
 
 export async function downloadAndVerify(_: IpcMainInvokeEvent) {
-    if (fs.existsSync(procPath)) {
-        const existing = fs.readFileSync(procPath);
-        if (verifySha(existing, arch)) {
-            console.log("[WayAFKNext] Binary found");
+    if (downloadPrebuilt) {
+        if (fs.existsSync(procPath)) {
+            const existing = fs.readFileSync(procPath);
+            if (verifySha(existing, arch)) {
+                console.log("[WayAFKNext] Using prebuilt binary");
+                return;
+            }
+        }
+
+        console.log("[WayAFKNext] Downloading binary:", url);
+        if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
+        const buffer = await downloadToBuffer(url);
+
+        if (!verifySha(buffer, arch)) {
+            throw new Error("Binary hash didn't match, aborting");
+        }
+
+        await fs.promises.writeFile(procPath, buffer);
+
+        chmodSync(procPath, 0o755);
+
+        console.log("[WayAFKNext] Downloaded binary!");
+    } else {
+        if (fs.existsSync(procPath)) {
+            console.log("[WayAFKNext] Using local binary");
             return;
         }
+
+        throw new Error("No local binary found");
     }
-
-    console.log("[WayAFKNext] Downloading binary:", url);
-    if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
-    const buffer = await downloadToBuffer(url);
-
-    if (!verifySha(buffer, arch)) {
-        throw new Error("Binary hash didn't match, aborting");
-    }
-
-    await fs.promises.writeFile(procPath, buffer);
-
-    chmodSync(procPath, 0o755);
-
-    console.log("[WayAFKNext] Downloaded binary!");
 }
 
 let webFrame: WebContents;

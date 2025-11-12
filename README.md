@@ -32,4 +32,8 @@ The binary is nothing but a bridge between Discord and `wayland-protocols ext-id
 
 I did it this way to avoid adding extra dependencies to Vencord, though realistically that wouldn't have hurt anything, and to avoid implementing all that stuff in nodejs to begin with. nodejs is yucky.
 
-Binary and socket end up in `~/.config/Vencord/wayafknext/`.
+If you don't want to use the prebuilt binary, then *before building Vencord*, edit native.ts and change `downloadPrebuilt` to `false`, and compile your own version of wayafknext-monitor and place it where the plugin expects to find it.
+
+Binary: `~/.config/Vencord/wayafknext/wayafknext-monitor.<x86_x64/aarch64>`
+
+Socket: `~/.config/Vencord/wayafknext/wayafknext.sock`
