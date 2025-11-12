@@ -36,6 +36,6 @@ I did it this way to avoid adding extra dependencies to Vencord, though realisti
 
 If you don't want to use the prebuilt binary, then *before building Vencord*, edit native.ts and change `downloadPrebuilt` to `false`, and compile your own version of wayafknext-monitor and place it where the plugin expects to find it.
 
-Binary: `~/.config/Vencord/wayafknext/wayafknext-monitor.<x86_x64/aarch64>`
+Binary: `~/.config/Vencord/wayafknext/wayafknext-monitor.<x86_64/aarch64>`
 
 Socket: `~/.config/Vencord/wayafknext/wayafknext.sock`
