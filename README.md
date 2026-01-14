@@ -18,6 +18,20 @@ It should be noted that this circumvents the Push Notification Inactive Time-out
 
 ## Installation
 
+### Arch Linux AUR
+
+A build of Vesktop with WayAFKNext included is available on the AUR under the package name [`vesktop-wayafknext-bin`](https://aur.archlinux.org/packages/vesktop-wayafknext-bin).
+
+Simply use your AUR helper like so: `yay -S vesktop-wayafknext-bin`
+
+Build automations for it are done here:
+
+https://github.com/JamDon2/Vencord-WayAFKNext
+
+Thanks to JamDon2 for doing this!
+
+### Manual
+
 Same as always with Vencord plugins.
 
 https://docs.vencord.dev/installing/custom-plugins/
