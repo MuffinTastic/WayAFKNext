@@ -143,7 +143,8 @@ export async function startMonitor(e: IpcMainInvokeEvent) {
 
     proc = spawn(procPath, [], {
         detached: false,
-        stdio: "pipe"
+        stdio: "pipe",
+        env: {...process.env, WAYAFKNEXT_SOCKET_PATH: sockPath },
     });
 
     proc.stdout.setEncoding("utf-8");
