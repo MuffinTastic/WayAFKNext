@@ -44,7 +44,7 @@ function getArch(): string {
 
 const arch = getArch();
 
-const downloadPrebuilt = true;
+const downloadPrebuilt = !process.env.WAYAFKNEXT_MONITOR_PATH;
 const url = `https://github.com/MuffinTastic/wayafknext-monitor/releases/download/v0.3.0/wayafknext-monitor.${arch}`;
 const shas = {
     "aarch64": "72f7400d0549cb760019fbd8ecf8086efca1841a01e9446f4c888e201914865a",
@@ -54,7 +54,7 @@ const shas = {
 const tmpDir = path.join(DATA_DIR, "wayafknext");
 const procName = path.basename(url);
 const sockName = "wayafknext.sock";
-const procPath = path.join(tmpDir, procName);
+const procPath = process.env.WAYAFKNEXT_MONITOR_PATH ?? path.join(tmpDir, procName);
 const sockPath = path.join(tmpDir, sockName);
 
 async function downloadToBuffer(url: string): Promise<Buffer> {
