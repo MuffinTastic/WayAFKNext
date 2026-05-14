@@ -48,7 +48,7 @@ The binary is nothing but a bridge between Discord and `wayland-protocols ext-id
 
 I did it this way to avoid adding extra dependencies to Vencord, though realistically that wouldn't have hurt anything, and to avoid implementing all that stuff in nodejs to begin with. nodejs is yucky.
 
-To use a custom binary and socket location, set `WAYAFKNEXT_MONITOR_PATH` in your environment variables before launching Discord.
+To use a custom binary and socket location, set `WAYAFKNEXT_MONITOR_PATH` and `WAYAFKNEXT_SOCKET_PATH` in your environment variables before launching Discord.
 
 Default binary location: `~/.config/Vencord/wayafknext/wayafknext-monitor.<x86_64/aarch64>`
 
