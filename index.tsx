@@ -172,6 +172,16 @@ export default definePlugin({
         }
     ],
 
+    flux: {
+        CONNECTION_OPEN() {
+            const alwaysSend = Settings.plugins.WayAFKNext.alwaysSendPushNotifications;
+            if (alwaysSend) {
+                if (debug) console.log("[WayAFKNext] Gateway reconnected, re-asserting AFK state");
+                utilSetDiscordAFK(true);
+            }
+        }
+    },
+
     async start() {
         await setDebug(Settings.plugins.WayAFKNext.debug);
 
