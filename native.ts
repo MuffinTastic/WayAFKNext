@@ -45,10 +45,10 @@ function getArch(): string {
 const arch = getArch();
 
 const downloadPrebuilt = !process.env.WAYAFKNEXT_MONITOR_PATH;
-const url = `https://github.com/MuffinTastic/wayafknext-monitor/releases/download/v0.3.0/wayafknext-monitor.${arch}`;
+const url = `https://github.com/MuffinTastic/wayafknext-monitor/releases/download/v0.3.1/wayafknext-monitor.${arch}`;
 const shas = {
-    "aarch64": "72f7400d0549cb760019fbd8ecf8086efca1841a01e9446f4c888e201914865a",
-    "x86_64": "f414550d9cf4771760921ee678468fd15523560a27c4fc2d8d0ee36be61be11f",
+    "aarch64": "70c1ed0ab9b2e18807bff445dd155167a061db85dc667b7b04d0a25895ca8e92",
+    "x86_64": "4cdd33481f55faf2140c91854a11b694c72008ea363ac9180f1314f1acae50ec",
 };
 
 const tmpDir = path.join(DATA_DIR, "wayafknext");
